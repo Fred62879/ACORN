@@ -1,0 +1,21 @@
+eval = True
+dataset = pluto
+num_workers = 2
+skip_logging = False
+experiment_name = 0
+
+lr = 0.001
+num_iters = 1000
+epochs_til_ckpt = 1
+steps_til_summary = 1
+steps_til_tiling = 500
+
+w0 = 5
+res = [1024]
+scale_init = 3
+hidden_layers = 4
+max_patches = 512
+hidden_features = 256
+patch_size = [16, 8, 8]
+model_type = multiscale
+

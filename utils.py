@@ -4,7 +4,7 @@ import os
 from torchvision.utils import make_grid
 import skimage.measure
 from tqdm import tqdm
-import mrcfile
+#import mrcfile
 
 
 def cond_mkdir(path):
@@ -32,7 +32,7 @@ def write_psnr(pred_img, gt_img, writer, iter, prefix):
 
     writer.add_scalar(prefix + "psnr", np.mean(psnrs), iter)
 
-
+'''
 def write_occupancy_multiscale_summary(image_resolution, dataset, model, model_input, gt,
                                        model_output, writer, total_steps, prefix='train_',
                                        output_mrc='test.mrc', skip=False,
@@ -84,7 +84,7 @@ def write_occupancy_multiscale_summary(image_resolution, dataset, model, model_i
         writer.add_figure(prefix + 'tiling', fig, global_step=total_steps)
 
     return display_occupancy
-
+'''
 
 def write_image_patch_multiscale_summary(image_resolution, patch_size, dataset, model, model_input, gt,
                                          model_output, writer, total_steps, prefix='train_',
@@ -203,7 +203,11 @@ def process_batch_in_chunks(in_dict, model, max_chunk_size=1024, progress=None):
     list_chunked_batched_out_out = {}
     list_chunked_batched_out_in = {}
     for chunk_batched_in in tqdm(list_chunked_batched_in):
-        chunk_batched_in = {k: v.cuda() for k, v in chunk_batched_in.items()}
+        if torch.cuda.is_available():
+            chunk_batched_in = {k: v.cuda() for k, v in chunk_batched_in.items()}
+        else:
+            chunk_batched_in = {k: v for k, v in chunk_batched_in.items()}
+
         tmp = model(chunk_batched_in)
         tmp = dict2cpu(tmp)
 

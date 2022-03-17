@@ -81,8 +81,8 @@ class PositionalEncoding(nn.Module):
         if self.gaussian_pe:
             # this needs to be registered as a parameter so that it is saved in the model state dict
             # and so that it is converted using .cuda(). Doesn't need to be trained though
-            self.gaussian_weights = nn.Parameter(gaussian_variance * torch.randn(num_encoding_functions, input_dim),
-                                                 requires_grad=False)
+            w = torch.randn(num_encoding_functions, input_dim)
+            self.gaussian_weights = nn.Parameter(gaussian_variance * w, requires_grad=False)
         else:
             self.frequency_bands = None
             if self.log_sampling:
@@ -175,11 +175,14 @@ class ImplicitAdaptivePatchNet(nn.Module):
             self.positional_encoding = PositionalEncoding(num_encoding_functions=num_encoding_functions)
             in_features = 2*in_features*num_encoding_functions + in_features
 
-        self.coord2features_net = FCBlock(in_features=in_features, out_features=np.prod(feature_grid_size),
-                                          num_hidden_layers=num_hidden_layers, hidden_features=hidden_features,
+        self.coord2features_net = FCBlock(in_features=in_features,
+                                          out_features=np.prod(feature_grid_size),
+                                          num_hidden_layers=num_hidden_layers,
+                                          hidden_features=hidden_features,
                                           outermost_linear=True, nonlinearity='relu')
 
-        self.features2sample_net = FCBlock(in_features=self.feature_grid_size[0], out_features=out_features,
+        self.features2sample_net = FCBlock(in_features=self.feature_grid_size[0],
+                                           out_features=out_features,
                                            num_hidden_layers=1, hidden_features=64,
                                            outermost_linear=True, nonlinearity='relu')
         print(self)
@@ -212,10 +215,12 @@ class ImplicitAdaptivePatchNet(nn.Module):
         x = sample_coords[..., 1:]
         sample_coords = torch.cat([y, x], dim=-1)
 
-        features_out = torch.nn.functional.grid_sample(features_in, sample_coords,
-                                                       mode='bilinear',
-                                                       padding_mode='border',
-                                                       align_corners=True).reshape(b_size, n_channels, np.prod(self.patch_size))
+        features_out = torch.nn.functional\
+                               .grid_sample(features_in, sample_coords,
+                                            mode='bilinear',
+                                            padding_mode='border',
+                                            align_corners=True)\
+                               .reshape(b_size, n_channels, np.prod(self.patch_size))
 
         # permute from (Blocks, feature_grid_size[0], patch_size**2)->(Blocks, patch_size**2, feature_grid_size[0])
         # so the network maps features to function output

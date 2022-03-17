@@ -12,8 +12,8 @@ import urllib.request
 from tqdm import tqdm
 import numpy as np
 import copy
-import trimesh
-from inside_mesh import inside_mesh
+#import trimesh
+#from inside_mesh import inside_mesh
 
 from scipy.spatial import cKDTree as spKDTree
 from data_structs import QuadTree, OctTree
@@ -102,7 +102,7 @@ def to_uint8(x):
 def to_numpy(x):
     return x.detach().cpu().numpy()
 
-
+'''
 class PointCloud(Dataset):
     def __init__(self, pointcloud_path, on_surface_points, keep_aspect_ratio=True):
         super().__init__()
@@ -157,7 +157,6 @@ class PointCloud(Dataset):
         return {'coords': torch.from_numpy(coords).float()}, {'sdf': torch.from_numpy(sdf).float(),
                                                               'normals': torch.from_numpy(normals).float()}
 
-
 class OccupancyDataset():
     def __init__(self, pc_or_mesh_filename):
         self.intersector = None
@@ -191,7 +190,7 @@ class OccupancyDataset():
 
     def evaluate_occupancy(self, pts):
         return self.intersector.query(pts).astype(int).reshape(-1, 1)
-
+'''
 
 class Camera(Dataset):
     def __init__(self, downsample_factor=1):
