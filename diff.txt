@@ -1,0 +1,112 @@
+2,3d1
+< #python3 train2d.py --config ./config/config_astro_acorn_64.ini
+< 
+67,68c65,66
+< p.add_argument('--nfilters', type=int, default=1,
+<                help='number of filters')
+---
+> p.add_argument('--grayscale', action='store_true', default=False,
+>                help='whether to use grayscale')
+116c114
+<     out_features = opt.nfilters
+---
+>     out_features = 1 if opt.grayscale else 3
+129,130d126
+<         objs_to_save = {'quadtree': coord_dataset.quadtree}
+< 
+131a128
+>         utils.cond_mkdir(root_path)
+133d129
+<         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+134a131,133
+>         objs_to_save = {'quadtree': coord_dataset.quadtree}
+> 
+>         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+275c274
+<                                        url=pluto_url, grayscale=False) #opt.grayscale)
+---
+>                                        url=pluto_url, grayscale=opt.grayscale)
+2,3d1
+< #python3 train2d.py --config ./config/config_astro_acorn_64.ini
+< 
+67,68c65,66
+< p.add_argument('--nfilters', type=int, default=3,
+<                help='number of filters')
+---
+> p.add_argument('--grayscale', action='store_true', default=False,
+>                help='whether to use grayscale')
+116c114
+<     out_features = opt.nfilters
+---
+>     out_features = 1 if opt.grayscale else 3
+129,130d126
+<         objs_to_save = {'quadtree': coord_dataset.quadtree}
+< 
+131a128
+>         utils.cond_mkdir(root_path)
+133d129
+<         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+134a131,133
+>         objs_to_save = {'quadtree': coord_dataset.quadtree}
+> 
+>         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+275c274
+<                                        url=pluto_url, grayscale=False) #opt.grayscale)
+---
+>                                        url=pluto_url, grayscale=opt.grayscale)
+2,3d1
+< #python3 train2d.py --config ./config/config_astro_acorn_64.ini
+< 
+67,68c65,66
+< p.add_argument('--nfilters', type=int, default=3,
+<                help='number of filters')
+---
+> p.add_argument('--grayscale', action='store_true', default=False,
+>                help='whether to use grayscale')
+116c114
+<     out_features = opt.nfilters
+---
+>     out_features = 1 if opt.grayscale else 3
+129,130d126
+<         objs_to_save = {'quadtree': coord_dataset.quadtree}
+< 
+131a128
+>         utils.cond_mkdir(root_path)
+133d129
+<         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+134a131,133
+>         objs_to_save = {'quadtree': coord_dataset.quadtree}
+> 
+>         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+275c274
+<                                        url=pluto_url, grayscale=False) #opt.grayscale)
+---
+>                                        url=pluto_url, grayscale=opt.grayscale)
+2,3d1
+< #python3 train2d.py --config ./config/config_astro_acorn_64.ini
+< 
+67,68c65,66
+< p.add_argument('--nfilters', type=int, default=3,
+<                help='number of filters')
+---
+> p.add_argument('--grayscale', action='store_true', default=False,
+>                help='whether to use grayscale')
+116c114
+<     out_features = opt.nfilters
+---
+>     out_features = 1 if opt.grayscale else 3
+129,130d126
+<         objs_to_save = {'quadtree': coord_dataset.quadtree}
+< 
+131a128
+>         utils.cond_mkdir(root_path)
+133d129
+<         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+134a131,133
+>         objs_to_save = {'quadtree': coord_dataset.quadtree}
+> 
+>         checkpoint_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
+275c274
+<                                        url=pluto_url, grayscale=False) #opt.grayscale)
+---
+>                                        url=pluto_url, grayscale=opt.grayscale)

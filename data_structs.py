@@ -1,11 +1,13 @@
+
+import copy
 import torch
 import numpy as np
 import gurobipy as gp
-from gurobipy import GRB
-import copy
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.patches as patches
+
+from gurobipy import GRB
 
 
 class QuadTree():
@@ -19,7 +21,7 @@ class QuadTree():
 
         # how many levels of quadtree are there
         self.min_quadtree_level = int(np.log2(np.min(self.sidelength) // self.max_patch_size))
-        self.max_quadtree_level = int(np.log2(np.min(sidelength) // self.min_patch_size))
+        self.max_quadtree_level = int(np.log2(np.min(self.sidelength) // self.min_patch_size))
         self.num_scales = self.max_quadtree_level - self.min_quadtree_level + 1
 
         # optimization model

@@ -24,6 +24,7 @@ def train(model, optim, train_dataloader, start_epoch, epochs, total_steps,
             # prune
             if not epoch % epochs_til_pruning and epoch:
                 pruning_fn(model, train_dataloader.dataset)
+
             retile = False if not (epoch + 1) % epochs_til_pruning else True
 
             for step, (model_input, gt) in enumerate(train_dataloader):
@@ -34,6 +35,7 @@ def train(model, optim, train_dataloader, start_epoch, epochs, total_steps,
                         tmp.update({key: value})
                     else:
                         tmp.update({key: value})
+
                 model_input = tmp
 
                 tmp = {}
@@ -55,7 +57,6 @@ def train(model, optim, train_dataloader, start_epoch, epochs, total_steps,
                 train_loss = 0.
                 for loss_name, loss in losses.items():
                     single_loss = loss.mean()
-
                     if loss_schedules is not None and loss_name in loss_schedules:
                         single_loss *= loss_schedules[loss_name](total_steps)
                     train_loss += single_loss

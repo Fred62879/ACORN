@@ -1,10 +1,14 @@
-import numpy as np
-import torch
 import os
-from torchvision.utils import make_grid
+import torch
+import numpy as np
 import skimage.measure
+import matplotlib.pyplot as plt
+
 from tqdm import tqdm
-#import mrcfile
+from astropy.io import fits
+from astropy.wcs import WCS
+from astropy.nddata import Cutout2D
+from torchvision.utils import make_grid
 
 
 def cond_mkdir(path):
@@ -32,59 +36,6 @@ def write_psnr(pred_img, gt_img, writer, iter, prefix):
 
     writer.add_scalar(prefix + "psnr", np.mean(psnrs), iter)
 
-'''
-def write_occupancy_multiscale_summary(image_resolution, dataset, model, model_input, gt,
-                                       model_output, writer, total_steps, prefix='train_',
-                                       output_mrc='test.mrc', skip=False,
-                                       oversample=1.0, max_chunk_size=1024, mode='binary'):
-    if skip:
-        return
-
-    model_input = dataset.get_eval_samples(oversample)
-
-    print("Summary: Write occupancy multiscale summary...")
-
-    # convert to cuda and add batch dimension
-    tmp = {}
-    for key, value in model_input.items():
-        if isinstance(value, torch.Tensor):
-            tmp.update({key: value[None, ...]})
-        else:
-            tmp.update({key: value})
-    model_input = tmp
-
-    print("Summary: processing...")
-    pred_occupancy = process_batch_in_chunks(model_input, model, max_chunk_size=max_chunk_size)['model_out']['output']
-
-    # get voxel idx for each coordinate
-    coords = model_input['fine_abs_coords'].detach().cpu().numpy()
-    voxel_idx = np.floor((coords + 1.) / 2. * (dataset.sidelength[0] * oversample)).astype(np.int32)
-    voxel_idx = voxel_idx.reshape(-1, 3)
-
-    # init a new occupancy volume
-    display_occupancy = -1 * np.ones(image_resolution, dtype=np.float32)
-
-    # assign predicted voxel occupancy values into the array
-    pred_occupancy = pred_occupancy.reshape(-1, 1).detach().cpu().numpy()
-    display_occupancy[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] = pred_occupancy[..., 0]
-
-    print(f"Summary: write MRC file {image_resolution}")
-    if mode == 'hq':
-        print("\tWriting float")
-        with mrcfile.new_mmap(output_mrc, overwrite=True, shape=image_resolution, mrc_mode=2) as mrc:
-            mrc.data[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] = pred_occupancy[..., 0]
-    elif mode == 'binary':
-        print("\tWriting binary")
-        with mrcfile.new_mmap(output_mrc, overwrite=True, shape=image_resolution) as mrc:
-            mrc.data[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] = pred_occupancy[..., 0] > 0
-
-    if writer is not None:
-        print("Summary: Draw octtree")
-        fig = dataset.octtree.draw()
-        writer.add_figure(prefix + 'tiling', fig, global_step=total_steps)
-
-    return display_occupancy
-'''
 
 def write_image_patch_multiscale_summary(image_resolution, patch_size, dataset, model, model_input, gt,
                                          model_output, writer, total_steps, prefix='train_',
@@ -255,3 +206,94 @@ def subsample_dict(in_dict, num_views, multiscale=False):
         out = {key: value[0:num_views, ...] for key, value in in_dict.items()}
 
     return out
+
+def get_header(dir, sz):
+    hdu = fits.open(os.path.join(dir, 'pdr3_dud/calexp-HSC-G-9813-0%2C0.fits'))[1]
+    header = hdu.header
+    cutout = Cutout2D(hdu.data, position=(sz//2, sz//2),
+                      size=sz, wcs=WCS(header))
+    return cutout.wcs.to_header()
+
+def reconstruct(id, coord_dataset, gt, model_input, model, recon_dir, header):
+
+    n_channels = gt['img'].shape[-1]
+
+    with torch.no_grad():
+        recon = process_batch_in_chunks\
+            (model_input, model, max_chunk_size=512)['model_out']['output']
+
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+    # get pixel idx for each coordinate
+    coords = model_input['fine_abs_coords'].detach().cpu().numpy()
+    pixel_idx = np.zeros_like(coords).astype(np.int32)
+    pixel_idx[..., 0] = np.round((coords[..., 0] + 1.)/2.*
+                                 (coord_dataset.sidelength[0] - 1)).astype(np.int32)
+
+    pixel_idx[..., 1] = np.round((coords[..., 1] + 1.)/2. *
+                                 (coord_dataset.sidelength[1] - 1)).astype(np.int32)
+    pixel_idx = pixel_idx.reshape(-1, 2)
+
+    recon = recon.detach().cpu().numpy()[0].transpose((2,0,1))
+    gt = gt['img'].detach().cpu().numpy()[0].transpose((2,0,1))
+
+    # record and save metrics
+    psnr, ssim, mse = get_metrics(recon, gt)
+    print(f'PSNR: {psnr:.04f}, SSIM: {ssim:.04f}, MSE:{mse:.06f}')
+
+    # save images
+    recon_fn = os.path.join(recon_dir, '{}'.format(id))
+    np.save(recon_fn + '.npy', recon)
+    hdu = fits.PrimaryHDU(data=recon, header=header)
+    hdu.writeto(recon_fn + '.fits', overwrite=True)
+
+    # save tiling
+    tiling_fname = os.path.join(recon_dir, 'tiling_{}.pdf'.format(id))
+    coord_dataset.quadtree.draw()
+    plt.savefig(tiling_fname)
+
+    return mse, psnr, ssim
+
+
+def get_metrics(pred_img, gt_img):
+    #pred_img = pred_img.detach().cpu().numpy().squeeze()
+    #gt_img = gt_img.detach().cpu().numpy().squeeze()
+
+    p = pred_img.transpose(1, 2, 0)
+    trgt = gt_img.transpose(1, 2, 0)
+
+    p = (p / 2.) + 0.5
+    p = np.clip(p, a_min=0., a_max=1.)
+
+    trgt = (trgt / 2.) + 0.5
+
+    mse = np.mean((p-trgt)**2)
+    psnr = skimage.metrics.peak_signal_noise_ratio(p, trgt, data_range=1)
+    ssim = skimage.metrics.structural_similarity(p, trgt, multichannel=True, data_range=1)
+
+    return psnr, ssim, mse
+
+'''
+# gt/recon, [c,h,w]
+def reconstruct(gt, recon, recon_path, loss_dir, header=None):
+    sz = gt.shape[1]
+    np.save(recon_path + '.npy', recon)
+
+    if header is not None:
+        print('GT max', np.round(np.max(gt, axis=(1,2)), 3) )
+        print('Recon pixl max ', np.round(np.max(recon, axis=(1,2)), 3) )
+        print('Recon stat ', round(np.min(recon), 3), round(np.median(recon), 3),
+              round(np.mean(recon), 3), round(np.max(recon), 3))
+
+        hdu = fits.PrimaryHDU(data=recon, header=header)
+        hdu.writeto(recon_path + '.fits', overwrite=True)
+
+        losses = get_losses(gt, recon, None, [1,2,4])
+
+        for nm, loss in zip(['_mse','_psnr','_ssim'], losses):
+            fn = '0_'+str(sz)+nm+'_0.npy'
+            loss = np.expand_dims(loss, axis=0)
+            print(loss)
+            np.save(os.path.join(loss_dir, fn), loss)
+'''
