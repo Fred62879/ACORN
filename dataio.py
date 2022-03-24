@@ -254,7 +254,7 @@ class AstroImageFile(Dataset):
     def __getitem__(self, idx):
         return self.img
 
-#class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
+
 class Patch2DWrapperMultiscaleAdaptive(Dataset):
     def __init__(self, dataset, patch_size=(16, 16), sidelength=None, random_coords=False,
                  jitter=True, num_workers=0, length=1000, scale_init=3, max_patches=1024):

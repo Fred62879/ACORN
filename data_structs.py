@@ -241,12 +241,14 @@ class QuadTree():
 
         def _get_active_patches_helper(curr_patch, patches):
             if curr_patch.active and \
-                (include_frozen_patches or
-                    (not include_frozen_patches and not curr_patch.frozen)):
+               (include_frozen_patches or not curr_patch.frozen):
+                #(include_frozen_patches or
+                #    (not include_frozen_patches and not curr_patch.frozen)):
                 patches.append(curr_patch)
             for patch in curr_patch.children:
                 _get_active_patches_helper(patch, patches)
             return patches
+
         return _get_active_patches_helper(self.root, [])
 
     def activate_random(self):
@@ -348,16 +350,15 @@ class QuadTree():
             self.optim_model.write("model.ilp")
 
         # split and merge
-        merged = 0
-        split = 0
-        none = 0
+        none, split, merged = 0, 0, 0
+
         for p in patches:
-            # print(p)
             if p.has_split() and p.scale < self.max_quadtree_level:
                 p.deactivate()
                 for child in p.get_children():
                     child.activate()
                 split += 1
+
             elif p.has_merged() and p.scale >= self.min_quadtree_level and p.scale > 0:
                 # we first check if it is active,
                 # since we could have already been activated by a neighbor
@@ -370,11 +371,9 @@ class QuadTree():
             else:
                 p.update()
                 none += 1
-        stats_dict = {'merged': merged,
-                      'splits': split,
-                      'none': none,
-                      'obj': obj_val}
-        print(f"============================= Total patches:{len(patches)}, split/merge:{split}/{merged}")
+
+        stats_dict = {'merged': merged, 'splits': split, 'none': none, 'obj': obj_val}
+        #print(f"============================= Total patches:{len(patches)}, split/merge:{split}/{merged}")
         return stats_dict
 
     def draw(self):

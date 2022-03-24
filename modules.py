@@ -1,7 +1,9 @@
-import torch
-from torch import nn
-import numpy as np
+
 import math
+import torch
+import numpy as np
+
+from torch import nn
 from functools import partial
 
 
@@ -185,10 +187,9 @@ class ImplicitAdaptivePatchNet(nn.Module):
                                            out_features=out_features,
                                            num_hidden_layers=1, hidden_features=64,
                                            outermost_linear=True, nonlinearity='relu')
-        print(self)
+        #print(self)
 
     def forward(self, model_input):
-
         # Enables us to compute gradients w.r.t. coordinates
         coords = model_input['coords'].clone().detach().requires_grad_(True)
         fine_coords = model_input['fine_rel_coords'].clone().detach().requires_grad_(True)

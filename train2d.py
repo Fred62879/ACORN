@@ -1,10 +1,8 @@
 
-#python3 train2d.py --config ./config/config_astro_acorn_64.ini
+#python train2d.py --config ./config/config_astro_acorn_64.ini
 
-# Enable import from parent package
 import os
 import re
-import cv2
 import sys
 import utils
 import torch
@@ -24,7 +22,6 @@ from time import time
 from functools import partial
 from torch.utils.data import DataLoader
 
-#python3 train_trail.py --config ./config/config_pluto_acorn_1k.in
 
 dim = '2d_5'
 data_dir = '../../data'
@@ -104,6 +101,8 @@ def main():
 
     image_resolution = (opt.res, opt.res)
     opt.num_epochs = opt.num_iters // coord_dataset.__len__()
+    print('Num epochs: {}'.format(opt.num_epochs))
+
     dataloader = DataLoader(coord_dataset, shuffle=False, batch_size=1,
                             pin_memory=True, num_workers=opt.num_workers)
     # define loss
@@ -122,9 +121,11 @@ def main():
     optim = torch.optim.Adam(lr=opt.lr, params=model.parameters())
 
     model_file_id, start_epoch, total_steps = 0, 0, 0
+
     if opt.resume:
         model_file_id, start_epoch, total_steps, \
             model, optimizer, coord_dataset = load_net(model, optim, coord_dataset)
+        print('loaded')
 
     # train or recon
     if opt.eval:
@@ -246,6 +247,7 @@ def init_model(out_features):
 
 
 def load_net(model, optim, coord_dataset):
+
     print('Loading checkpoints')
     try:
         model_dir = os.path.join(opt.logging_root, opt.experiment_name, 'models')
@@ -256,12 +258,12 @@ def load_net(model, optim, coord_dataset):
         if nmodels < 1:
             raise ValueError("No saved models to load")
 
-        model_fn = os.path.join(model_dir, f'model{nmodels-1:06d}.pth')
+        model_fn = os.path.join(model_dir, 'model{}.pth'.format(nmodels-1))
         checkpoint = torch.load(model_fn)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.train()
 
-        if cuda:
+        if torch.cuda.is_available():
             optim.load_state_dict(checkpoint['optimizer_state_dict'])
             for state in optim.state.values():
                 for k, v in state.items():
@@ -283,6 +285,7 @@ def load_net(model, optim, coord_dataset):
     except FileNotFoundError:
         print('Loading failed, start training from begining')
         return 0, 0, 0, model, optim, coord_dataset
+    #return 0, 0, 0, model, optim, coord_dataset
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
