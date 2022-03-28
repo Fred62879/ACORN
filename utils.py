@@ -214,8 +214,64 @@ def get_header(dir, sz):
                       size=sz, wcs=WCS(header))
     return cutout.wcs.to_header()
 
-def reconstruct(id, coord_dataset, gt, model_input, model, recon_dir, header):
 
+def reconstruct_trail(id, coord_dataset, gt, model_input, model, recon_dir, header):
+    n_channels = gt['img'].shape[-1]
+
+    pred_img = pred_img.detach().cpu().numpy().reshape(-1, n_channels)
+    display_pred = np.zeros((*coord_dataset.sidelength, n_channels))
+    display_pred[[pixel_idx[:, 0]], [pixel_idx[:, 1]]] = pred_img
+    display_pred = torch.tensor(display_pred)[None, ...]
+    display_pred = display_pred.permute(0, 3, 1, 2)
+
+    if not saved_gt:
+        gt_img = gt['img'].detach().cpu().numpy().reshape(-1, n_channels)
+        display_gt = np.zeros((*coord_dataset.sidelength, n_channels))
+        display_gt[[pixel_idx[:, 0]], [pixel_idx[:, 1]]] = gt_img
+        display_gt = torch.tensor(display_gt)[None, ...]
+        display_gt = display_gt.permute(0, 3, 1, 2)
+    print(f'Reshape: {time() - start:.02f}')
+
+    # record metrics
+    start = time()
+    psnr, ssim = get_metrics(display_pred, display_gt)
+    metrics.update({curr_iter: {'psnr': psnr, 'ssim': ssim}})
+    print(f'Metrics: {time() - start:.02f}')
+    print(f'Iter: {curr_iter}, PSNR: {psnr:.02f}')
+
+    # save images
+    pred_out = np.clip((display_pred.squeeze().numpy()/2.) + 0.5, a_min=0., a_max=1.).transpose(1, 2, 0)*255
+    pred_out = pred_out.astype(np.uint8)
+    pred_fname = os.path.join(eval_dir, f'pred_{curr_iter:06d}.png')
+    print('Saving image')
+    cv2.imwrite(pred_fname, cv2.cvtColor(pred_out, cv2.COLOR_RGB2BGR))
+
+    if not saved_gt:
+        gt_out = np.clip((display_gt.squeeze().numpy()/2.) + 0.5, a_min=0., a_max=1.).transpose(1, 2, 0)*255
+        gt_out = gt_out.astype(np.uint8)
+        gt_fname = os.path.join(eval_dir, 'gt.png')
+        cv2.imwrite(gt_fname, cv2.cvtColor(gt_out, cv2.COLOR_RGB2BGR))
+        saved_gt = True
+
+    # record and save metrics
+    psnr, ssim, mse = get_metrics(recon, gt)
+    print(f'PSNR: {psnr:.04f}, SSIM: {ssim:.04f}, MSE:{mse:.06f}')
+
+    # save images
+    recon_fn = os.path.join(recon_dir, '{}'.format(id))
+    np.save(recon_fn + '.npy', recon)
+    hdu = fits.PrimaryHDU(data=recon, header=header)
+    hdu.writeto(recon_fn + '.fits', overwrite=True)
+
+    # save tiling
+    tiling_fname = os.path.join(recon_dir, 'tiling_{}.pdf'.format(id))
+    coord_dataset.quadtree.draw()
+    plt.savefig(tiling_fname)
+
+    return mse, psnr, ssim
+
+
+def reconstruct_astro(id, coord_dataset, gt, model_input, model, recon_dir, header):
     n_channels = gt['img'].shape[-1]
 
     with torch.no_grad():
@@ -237,6 +293,7 @@ def reconstruct(id, coord_dataset, gt, model_input, model, recon_dir, header):
 
     recon = recon.detach().cpu().numpy()[0].transpose((2,0,1))
     gt = gt['img'].detach().cpu().numpy()[0].transpose((2,0,1))
+    print(gt.shape)
 
     # record and save metrics
     psnr, ssim, mse = get_metrics(recon, gt)
@@ -268,32 +325,10 @@ def get_metrics(pred_img, gt_img):
 
     trgt = (trgt / 2.) + 0.5
 
+    range = np.max(gt_img) - np.min(gt_img)
     mse = np.mean((p-trgt)**2)
-    psnr = skimage.metrics.peak_signal_noise_ratio(p, trgt, data_range=1)
-    ssim = skimage.metrics.structural_similarity(p, trgt, multichannel=True, data_range=1)
+    print(p.shape, trgt.shape)
+    psnr = skimage.metrics.peak_signal_noise_ratio(p, trgt, data_range=range)
+    ssim = skimage.metrics.structural_similarity(p, trgt, multichannel=True, data_range=range)
 
     return psnr, ssim, mse
-
-'''
-# gt/recon, [c,h,w]
-def reconstruct(gt, recon, recon_path, loss_dir, header=None):
-    sz = gt.shape[1]
-    np.save(recon_path + '.npy', recon)
-
-    if header is not None:
-        print('GT max', np.round(np.max(gt, axis=(1,2)), 3) )
-        print('Recon pixl max ', np.round(np.max(recon, axis=(1,2)), 3) )
-        print('Recon stat ', round(np.min(recon), 3), round(np.median(recon), 3),
-              round(np.mean(recon), 3), round(np.max(recon), 3))
-
-        hdu = fits.PrimaryHDU(data=recon, header=header)
-        hdu.writeto(recon_path + '.fits', overwrite=True)
-
-        losses = get_losses(gt, recon, None, [1,2,4])
-
-        for nm, loss in zip(['_mse','_psnr','_ssim'], losses):
-            fn = '0_'+str(sz)+nm+'_0.npy'
-            loss = np.expand_dims(loss, axis=0)
-            print(loss)
-            np.save(os.path.join(loss_dir, fn), loss)
-'''

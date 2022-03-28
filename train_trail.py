@@ -217,7 +217,7 @@ def run_eval(model, coord_dataset):
         # record metrics
         psnr, ssim, mse = get_metrics(display_pred, display_gt)
         mses.append(mse);psnrs.append(psnr);ssims.append(ssim)
-        print(f'PSNR: {psnr:.02f}, SSIM: {ssim:.02f}, MSE:{mse:.02f}')
+        print(f'PSNR: {psnr:.02f}, SSIM: {ssim:.02f}, MSE:{mse:.06f}')
 
         # save images
         pred_out = np.clip((display_pred.squeeze().numpy()/2.) + 0.5,
@@ -284,7 +284,7 @@ def load_data():
     coord_dataset = dataio.Patch2DWrapperMultiscaleAdaptive\
         (img_dataset, sidelength=opt.res, patch_size=opt.patch_size[1:],
          jitter=True, num_workers=opt.num_workers, length=opt.steps_til_tiling,
-         scale_init=opt.scale_init, max_patches=opt.max_patches)
+         scale_init=opt.scale_init, max_patches=opt.max_patches, astro=False)
 
     return coord_dataset
 

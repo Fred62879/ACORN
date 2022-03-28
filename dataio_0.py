@@ -4,7 +4,6 @@ import copy
 import math
 import errno
 import torch
-#import trimesh
 import skimage
 import numpy as np
 import urllib.request
@@ -13,11 +12,13 @@ import matplotlib.colors as colors
 
 from tqdm import tqdm
 from PIL import Image
-#from inside_mesh import inside_mesh
 from torch.utils.data import Dataset
-from data_struct import QuadTree, OctTree
+from data_structs import QuadTree, OctTree
 from scipy.spatial import cKDTree as spKDTree
 from torchvision.transforms import Resize, Compose, ToTensor, Normalize
+
+#import trimesh
+#from inside_mesh import inside_mesh
 
 
 def get_mgrid(sidelen, dim=2):
@@ -103,7 +104,7 @@ def to_uint8(x):
 def to_numpy(x):
     return x.detach().cpu().numpy()
 
-
+'''
 class PointCloud(Dataset):
     def __init__(self, pointcloud_path, on_surface_points, keep_aspect_ratio=True):
         super().__init__()
@@ -158,7 +159,6 @@ class PointCloud(Dataset):
         return {'coords': torch.from_numpy(coords).float()}, {'sdf': torch.from_numpy(sdf).float(),
                                                               'normals': torch.from_numpy(normals).float()}
 
-
 class OccupancyDataset():
     def __init__(self, pc_or_mesh_filename):
         self.intersector = None
@@ -192,7 +192,7 @@ class OccupancyDataset():
 
     def evaluate_occupancy(self, pts):
         return self.intersector.query(pts).astype(int).reshape(-1, 1)
-
+'''
 
 class Camera(Dataset):
     def __init__(self, downsample_factor=1):
@@ -229,6 +229,7 @@ class ImageFile(Dataset):
                 print('Downloading image file...')
                 urllib.request.urlretrieve(url, filename)
 
+        self.img = np.load(filename)
         self.img = Image.open(filename)
         if grayscale:
             self.img = self.img.convert('L')
@@ -240,7 +241,6 @@ class ImageFile(Dataset):
 
     def __getitem__(self, idx):
         return self.img
-
 
 class AstroImageFile(Dataset):
     def __init__(self, filename):
@@ -254,10 +254,10 @@ class AstroImageFile(Dataset):
     def __getitem__(self, idx):
         return self.img
 
-    
-class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
+
+class Patch2DWrapperMultiscaleAdaptive(Dataset):
     def __init__(self, dataset, patch_size=(16, 16), sidelength=None, random_coords=False,
-                 jitter=True, num_workers=0, length=1000, scale_init=3, max_patches=1024, astro=True):
+                 jitter=True, num_workers=0, length=1000, scale_init=3, max_patches=1024):
 
         self.length = length
         if len(sidelength) == 1:
@@ -265,13 +265,25 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
         self.sidelength = sidelength
 
         for i in range(2):
-            assert float(sidelength[i]) / float(patch_size[i]) % 1 == 0, 'Resolution not divisible by patch size'
-        assert float(sidelength[0]) / float(patch_size[0]) == float(sidelength[1]) / float(patch_size[1]), \
+            assert float(sidelength[i]) / float(patch_size[i]) % 1 == 0, \
+                'Resolution not divisible by patch size'
+
+        assert float(sidelength[0]) / float(patch_size[0]) == \
+            float(sidelength[1]) / float(patch_size[1]), \
             'number of patches must be same along each dim; check values of resolution and patch size'
+
+        '''
+        self.transform = Compose([
+            Resize(sidelength),
+            ToTensor(),
+            Normalize(torch.Tensor([0.5]), torch.Tensor([0.5]))
+        ])
+        '''
 
         # initialize quad tree
         self.quadtree = QuadTree(sidelength, patch_size)
         self.num_scales = self.quadtree.max_quadtree_level - self.quadtree.min_quadtree_level + 1
+        #print("scales", self.quadtree.max_quadtree_level, self.quadtree.min_quadtree_level)
         self.max_patches = max_patches
 
         # set patches at coarsest level to be active
@@ -289,22 +301,15 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
             self.quadtrees.append(copy.deepcopy(self.quadtree))
         self.last_active_patches = self.quadtree.get_active_patches()
 
-        self.transform = Compose([
-            Resize(sidelength),
-            ToTensor(),
-            Normalize(torch.Tensor([0.5]), torch.Tensor([0.5]))
-        ])
+        # set random patches to be active
+        # self.quadtree.activate_random()
 
         self.eval = False
         self.jitter = jitter
         self.dataset = dataset
         self.patch_size = patch_size
-
-        if astro:
-            self.img = torch.tensor(self.dataset[0])
-            print('dataio', self.img.shape)
-        else:
-            self.img = self.transform(self.dataset[0])
+        #self.img = self.transform(self.dataset[0])
+        self.img = torch.tensor(self.dataset[0])
 
     def toggle_eval(self):
         if not self.eval:
@@ -316,8 +321,6 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
             self.eval = False
 
     def interpolate_bilinear(self, img, fine_abs_coords, psize):
-        print('interpolate', img.shape)
-        
         n_blocks = fine_abs_coords.shape[0]
         n_channels = img.shape[0]
         fine_abs_coords = fine_abs_coords.reshape(n_blocks, psize[0], psize[1], 2)
@@ -327,14 +330,12 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
 
         out = []
         for block in coords:
-            tmp = torch.nn.functional.grid_sample\
-                (img[None, ...], block[None, ...], mode='bilinear',
-                 padding_mode='reflection', align_corners=False)
-
+            tmp = torch.nn.functional.\
+                grid_sample(img[None, ...], block[None, ...], mode='bilinear',
+                            padding_mode='reflection', align_corners=False)
             out.append(tmp)
 
         out = torch.cat(out, dim=0)
-        print(out.shape)
         out = out.permute(0, 2, 3, 1)
         return out.reshape(n_blocks, np.prod(psize), n_channels)
 
@@ -343,9 +344,9 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
 
         if self.num_workers == 0:
             return
-        else:
-            for idx in range(self.num_workers):
-                self.quadtrees[idx].synchronize(self.quadtree)
+
+        for idx in range(self.num_workers):
+            self.quadtrees[idx].synchronize(self.quadtree)
 
     def __len__(self):
         # return len(self.dataset)
@@ -368,8 +369,7 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
             quadtree = self.quadtrees[worker_idx]
 
         # get fine coords
-        fine_rel_coords, fine_abs_coords, coord_patch_idx = \
-            quadtree.get_stratified_samples(self.jitter, eval=self.eval)
+        fine_rel_coords, fine_abs_coords, coord_patch_idx = quadtree.get_stratified_samples(self.jitter, eval=self.eval)
 
         # get block coords
         patches = quadtree.get_active_patches()
@@ -381,10 +381,8 @@ class Patch2DWrapperMultiscaleAdaptive(torch.utils.data.Dataset):
         if self.eval:
             coords = coords[coord_patch_idx]
 
-        fine_abs_coords = fine_abs_coords
-        print('get item', self.img.shape)
+        #fine_abs_coords = fine_abs_coords
         img = self.interpolate_bilinear(self.img, fine_abs_coords, self.patch_size)
-        print('after interpolate', img.shape)
 
         in_dict = {'coords': coords,
                    'fine_abs_coords': fine_abs_coords,

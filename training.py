@@ -17,8 +17,6 @@ def train(model, optim, train_dataloader, start_epoch, epochs, total_steps,
     print("length dataloader:{}".format(len(train_dataloader)))
 
     for epoch in range(start_epoch, epochs):
-        start_time = time.time()
-
         if not epoch % epochs_til_pruning and epoch:
             pruning_fn(model, train_dataloader.dataset)
 
@@ -68,11 +66,7 @@ def train(model, optim, train_dataloader, start_epoch, epochs, total_steps,
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=clip_grad)
 
             optim.step()
-            #pbar.update(1)
             total_steps += 1
-
-        #tqdm.write("Epoch %d, Total loss %0.6f, iteration time %0.6f" %
-        #           (epoch, train_loss, time.time() - start_time))
 
         if not epoch % epochs_til_checkpoint or epoch == 0:
             print("Epoch %d, Total loss %0.6f" % (epoch, train_loss))

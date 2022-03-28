@@ -90,8 +90,8 @@ opt.logging_root += '/' + str(opt.res[0])
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = str(opt.gpu)
 
-for k, v in opt.__dict__.items():
-    print(k, v)
+#for k, v in opt.__dict__.items():
+#    print(k, v)
 
 
 def main():
@@ -112,8 +112,7 @@ def main():
                       model_type=opt.model_type)
 
     # define pruning function
-    pruning_fn = partial(pruning_functions.no_pruning,
-                         pruning_every=1)
+    pruning_fn = partial(pruning_functions.no_pruning, pruning_every=1)
 
     # init model and optimizer
     out_features = opt.nfilters
@@ -180,8 +179,9 @@ def run_eval(model, coord_dataset, header):
                 tmp.update({key: value})
         gt = tmp
 
-        mse, psnr, ssim = utils.reconstruct(id, coord_dataset, gt, model_input,
-                                            model, recon_dir, header)
+        print('in eval', gt['img'].shape)
+        mse, psnr, ssim = utils.reconstruct_astro(id, coord_dataset, gt, model_input,
+                                                  model, recon_dir, header)
         mses.append(mse);psnrs.append(psnr);ssims.append(ssim)
 
     np.save(os.path.join(metrics_dir, 'mse.npy'), np.array(mses))
@@ -190,20 +190,21 @@ def run_eval(model, coord_dataset, header):
 
 
 def load_data():
+    img_sz = opt.res[0]
+
     '''
     if opt.dataset == 'camera':
         img_dataset = dataio.Camera()
     elif opt.dataset == 'pluto':
         pluto_url = "https://upload.wikimedia.org/wikipedia/commons/e/ef/Pluto_in_True_Color_-_High-Res.jpg"
         img_dataset = dataio.ImageFile(os.path.join(orig_img_dir, 'pluto.jpg'),
-                                       url=pluto_url, grayscale=False) #opt.grayscale)
+                                       url=pluto_url, grayscale=False, grayscale=opt.grayscale)
     elif opt.dataset == 'tokyo':
         img_dataset = dataio.ImageFile('../data/tokyo.tif', grayscale=opt.grayscale)
     elif opt.dataset == 'mars':
         img_dataset = dataio.ImageFile('../data/mars.tif', grayscale=opt.grayscale)
     '''
 
-    img_sz = opt.res[0]
     img_dataset = dataio.AstroImageFile(os.path.join(orig_img_dir, '0_'+str(img_sz)+'.npy'))
 
     if len(opt.patch_size) == 1:

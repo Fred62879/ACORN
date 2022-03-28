@@ -17,11 +17,13 @@ class QuadTree():
         self.patch_size = patch_size
         self.min_patch_size = np.min(patch_size)
         self.max_patch_size = np.min(sidelength)
+        print('patch size', self.min_patch_size, self.max_patch_size)
         self.aspect_ratio = np.array(patch_size) / np.min(patch_size)
 
         # how many levels of quadtree are there
         self.min_quadtree_level = int(np.log2(np.min(self.sidelength) // self.max_patch_size))
         self.max_quadtree_level = int(np.log2(np.min(self.sidelength) // self.min_patch_size))
+        print('level', self.min_quadtree_level, self.max_quadtree_level)
         self.num_scales = self.max_quadtree_level - self.min_quadtree_level + 1
 
         # optimization model
@@ -327,7 +329,8 @@ class QuadTree():
 
     def solve_optim(self, max_num_patches=1024):
         patches = self.get_active_patches()
-
+        print('Total active patches', len(patches))
+        
         assert (len(patches) <= max_num_patches), \
             "You are trying to solve a model which is infeasible: " \
             "Number of active patches > Max number of patches"
@@ -373,7 +376,7 @@ class QuadTree():
                 none += 1
 
         stats_dict = {'merged': merged, 'splits': split, 'none': none, 'obj': obj_val}
-        #print(f"============================= Total patches:{len(patches)}, split/merge:{split}/{merged}")
+        print(f"============================= Total patches:{len(patches)}, split/merge:{split}/{merged}")
         return stats_dict
 
     def draw(self):
